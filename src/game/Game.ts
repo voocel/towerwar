@@ -123,6 +123,8 @@ export class Game {
     window.addEventListener('keydown', (ev) => {
       if (ev.code === 'Space') {
         ev.preventDefault();
+        // Node always takes priority — Space shouldn't bypass a pending reward choice.
+        if (state.pendingNode) return;
         if (state.pendingActTransition) advanceAct();
         else if (canStartWave()) startNextWave();
         else state.paused = !state.paused;

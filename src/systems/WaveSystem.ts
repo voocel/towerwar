@@ -91,6 +91,9 @@ function completeWave() {
 
 export function advanceAct() {
   if (!state.pendingActTransition) return;
+  // Node must be resolved first if one is pending (safeguards against future wave
+  // configs where the act's last wave also offers a node).
+  if (state.pendingNode) return;
   const nextIndex = state.currentActIndex + 1;
   if (nextIndex >= ACTS.length) {
     // Safety net: shouldn't happen given completeWave guards, but don't strand the game.
@@ -108,6 +111,11 @@ export function advanceAct() {
   state.waveSpawnQueue = [];
   state.waveEnemiesRemaining = 0;
   state.waveActive = false;
+
+  // Reset per-frame visual / buff residue so it doesn't leak into the new act
+  state.shakeIntensity = 0;
+  state.afterglowUntil = 0;
+  state.selectedTowerToPlace = null;
 
   state.currentActIndex = nextIndex;
   state.currentMapId = ACTS[nextIndex].mapId;
