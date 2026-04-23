@@ -250,6 +250,8 @@ function drawBoss(ctx: Ctx, e: Enemy, accent: string) {
 function drawBoss1(ctx: Ctx, e: Enemy) { drawBoss(ctx, e, PALETTE.accentHot); }
 function drawBoss2(ctx: Ctx, e: Enemy) { drawBoss(ctx, e, PALETTE.accent); }
 function drawBoss3(ctx: Ctx, e: Enemy) { drawBoss(ctx, e, PALETTE.accentCool); }
+function drawBoss4(ctx: Ctx, e: Enemy) { drawBoss(ctx, e, PALETTE.fireAccent); }
+function drawBoss5(ctx: Ctx, e: Enemy) { drawBoss(ctx, e, PALETTE.accentRose); }
 
 function drawStatusOverlays(ctx: Ctx, e: Enemy) {
   if (state.time < e.freezeUntil) {
@@ -343,4 +345,6 @@ const DRAWERS: Record<string, (ctx: Ctx, e: Enemy) => void> = {
   boss1: drawBoss1,
   boss2: drawBoss2,
   boss3: drawBoss3,
+  boss4: drawBoss4,
+  boss5: drawBoss5,
 };

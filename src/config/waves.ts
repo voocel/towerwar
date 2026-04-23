@@ -169,16 +169,133 @@ const ACT2_WAVES: WaveDef[] = [
   ]},
 ];
 
-export const WAVES_BY_ACT: readonly (readonly WaveDef[])[] = [ACT0_WAVES, ACT1_WAVES, ACT2_WAVES];
+// ---- Act 3 · 熔岩之巢 ------------------------------------------------------
+const ACT3_WAVES: WaveDef[] = [
+  { id: 1, name: '波 1', rewardGold: 70, spawns: [
+    { type: 'flying', count: 8, delay: 0.7 },
+    { type: 'fast', count: 10, delay: 0.45, startOffset: 2 },
+  ]},
+  { id: 2, name: '波 2', rewardGold: 70, spawns: [
+    { type: 'defender', count: 5, delay: 2 },
+    { type: 'elite', count: 3, delay: 3, startOffset: 4 },
+  ]},
+  { id: 3, name: '波 3', rewardGold: 70, offerNode: true, spawns: [
+    { type: 'normal', count: 14, delay: 0.5 },
+    { type: 'elite', count: 4, delay: 2.5, startOffset: 2 },
+  ]},
+  { id: 4, name: '波 4', rewardGold: 70, spawns: [
+    { type: 'normal', count: 16, delay: 0.4 },
+    { type: 'fast', count: 10, delay: 0.35, startOffset: 3 },
+    { type: 'flying', count: 4, delay: 0.9, startOffset: 1 },
+  ]},
+  { id: 5, name: '波 5', rewardGold: 70, spawns: [
+    { type: 'elite', count: 7, delay: 2 },
+  ]},
+  { id: 6, name: '波 6', rewardGold: 70, offerNode: true, spawns: [
+    { type: 'defender', count: 5, delay: 2 },
+    { type: 'support', count: 4, delay: 2, startOffset: 1 },
+    { type: 'flying', count: 8, delay: 0.8, startOffset: 2 },
+  ]},
+  { id: 7, name: '波 7', rewardGold: 70, spawns: [
+    { type: 'flying', count: 14, delay: 0.5 },
+    { type: 'support', count: 3, delay: 3, startOffset: 2 },
+  ]},
+  { id: 8, name: '波 8', rewardGold: 70, spawns: [
+    { type: 'elite', count: 6, delay: 2 },
+    { type: 'defender', count: 4, delay: 2.5, startOffset: 2 },
+  ]},
+  { id: 9, name: '波 9', rewardGold: 70, offerNode: true, spawns: [
+    { type: 'elite', count: 4, delay: 2.5 },
+    { type: 'flying', count: 10, delay: 0.6, startOffset: 1 },
+    { type: 'support', count: 4, delay: 2, startOffset: 3 },
+    { type: 'fast', count: 12, delay: 0.4, startOffset: 2 },
+  ]},
+  { id: 10, name: '波 10 · 大军', rewardGold: 90, spawns: [
+    { type: 'normal', count: 18, delay: 0.4 },
+    { type: 'fast', count: 12, delay: 0.35, startOffset: 1 },
+    { type: 'flying', count: 8, delay: 0.7, startOffset: 2 },
+    { type: 'elite', count: 5, delay: 2.5, startOffset: 4 },
+    { type: 'defender', count: 3, delay: 3, startOffset: 8 },
+  ]},
+  { id: 11, name: 'BOSS · 熔心暴君', rewardGold: 0, spawns: [
+    { type: 'boss4', count: 1, delay: 0 },
+    { type: 'elite', count: 3, delay: 4, startOffset: 2 },
+    { type: 'support', count: 3, delay: 3.5, startOffset: 4 },
+    { type: 'flying', count: 6, delay: 1.0, startOffset: 1 },
+  ]},
+];
+
+// ---- Act 4 · 苍穹之渊 (终幕) -----------------------------------------------
+const ACT4_WAVES: WaveDef[] = [
+  { id: 1, name: '波 1', rewardGold: 80, spawns: [
+    { type: 'elite', count: 4, delay: 2.2 },
+    { type: 'flying', count: 8, delay: 0.7, startOffset: 1 },
+    { type: 'fast', count: 10, delay: 0.4, startOffset: 3 },
+  ]},
+  { id: 2, name: '波 2', rewardGold: 80, spawns: [
+    { type: 'elite', count: 6, delay: 1.8 },
+    { type: 'defender', count: 4, delay: 2.5, startOffset: 2 },
+  ]},
+  { id: 3, name: '波 3', rewardGold: 80, offerNode: true, spawns: [
+    { type: 'normal', count: 16, delay: 0.4 },
+    { type: 'elite', count: 4, delay: 2.5, startOffset: 2 },
+    { type: 'support', count: 3, delay: 2.5, startOffset: 4 },
+    { type: 'flying', count: 6, delay: 0.8, startOffset: 1 },
+  ]},
+  { id: 4, name: '波 4 · 飞行突击', rewardGold: 80, spawns: [
+    { type: 'flying', count: 22, delay: 0.45 },
+  ]},
+  { id: 5, name: '波 5 · 坚壁', rewardGold: 80, spawns: [
+    { type: 'defender', count: 8, delay: 1.6 },
+    { type: 'support', count: 4, delay: 2.5, startOffset: 2 },
+  ]},
+  { id: 6, name: '波 6', rewardGold: 80, offerNode: true, spawns: [
+    { type: 'elite', count: 5, delay: 2.2 },
+    { type: 'defender', count: 5, delay: 2.2, startOffset: 2 },
+    { type: 'support', count: 5, delay: 2, startOffset: 4 },
+  ]},
+  { id: 7, name: '波 7 · 精英潮', rewardGold: 80, spawns: [
+    { type: 'elite', count: 10, delay: 1.6 },
+  ]},
+  { id: 8, name: '波 8', rewardGold: 80, spawns: [
+    { type: 'fast', count: 20, delay: 0.3 },
+    { type: 'flying', count: 10, delay: 0.6, startOffset: 2 },
+    { type: 'elite', count: 4, delay: 3, startOffset: 3 },
+  ]},
+  { id: 9, name: '波 9', rewardGold: 80, offerNode: true, spawns: [
+    { type: 'defender', count: 6, delay: 2 },
+    { type: 'elite', count: 5, delay: 2.5, startOffset: 1 },
+    { type: 'flying', count: 12, delay: 0.6, startOffset: 2 },
+    { type: 'support', count: 5, delay: 2, startOffset: 4 },
+    { type: 'fast', count: 14, delay: 0.35, startOffset: 3 },
+  ]},
+  { id: 10, name: '波 10 · 最终风暴', rewardGold: 100, spawns: [
+    { type: 'normal', count: 25, delay: 0.35 },
+    { type: 'fast', count: 20, delay: 0.3, startOffset: 1 },
+    { type: 'flying', count: 12, delay: 0.6, startOffset: 2 },
+    { type: 'elite', count: 6, delay: 2.2, startOffset: 4 },
+    { type: 'defender', count: 5, delay: 2.5, startOffset: 6 },
+    { type: 'support', count: 4, delay: 3, startOffset: 8 },
+  ]},
+  { id: 11, name: 'BOSS · 虚空之主', rewardGold: 0, spawns: [
+    { type: 'boss5', count: 1, delay: 0 },
+    { type: 'elite', count: 4, delay: 3.5, startOffset: 3 },
+    { type: 'defender', count: 3, delay: 4, startOffset: 6 },
+    { type: 'flying', count: 10, delay: 1.0, startOffset: 1 },
+    { type: 'support', count: 3, delay: 4, startOffset: 9 },
+  ]},
+];
+
+export const WAVES_BY_ACT: readonly (readonly WaveDef[])[] = [ACT0_WAVES, ACT1_WAVES, ACT2_WAVES, ACT3_WAVES, ACT4_WAVES];
 
 export function getActWaves(actIndex: number): readonly WaveDef[] {
   const clamped = Math.max(0, Math.min(WAVES_BY_ACT.length - 1, actIndex));
   return WAVES_BY_ACT[clamped];
 }
 
-// Difficulty multiplier applied to each spawned Enemy's hp/maxHp/reward
+// Difficulty multiplier applied to each spawned Enemy's hp/maxHp
 // to make later acts harder without duplicating per-act enemy stat tables.
-const ACT_DIFFICULTY_SCALE = [1.0, 1.55, 2.2] as const;
+const ACT_DIFFICULTY_SCALE = [1.0, 1.4, 1.85, 2.4, 3.0] as const;
 
 export function actDifficultyScale(actIndex: number): number {
   const clamped = Math.max(0, Math.min(ACT_DIFFICULTY_SCALE.length - 1, actIndex));
@@ -186,7 +303,7 @@ export function actDifficultyScale(actIndex: number): number {
 }
 
 // Reward scales slower than HP so money doesn't spiral out.
-const ACT_REWARD_SCALE = [1.0, 1.25, 1.5] as const;
+const ACT_REWARD_SCALE = [1.0, 1.2, 1.4, 1.6, 1.8] as const;
 
 export function actRewardScale(actIndex: number): number {
   const clamped = Math.max(0, Math.min(ACT_REWARD_SCALE.length - 1, actIndex));

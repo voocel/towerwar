@@ -9,7 +9,7 @@ export type RelicId =
   | 'chain' | 'brand' | 'afterglow' | 'crystal' | 'eternalfire' | 'resonance';
 export type EnemyTypeId =
   | 'normal' | 'fast' | 'elite' | 'flying' | 'defender' | 'support'
-  | 'boss1' | 'boss2' | 'boss3';
+  | 'boss1' | 'boss2' | 'boss3' | 'boss4' | 'boss5';
 
 export interface Vec2 { x: number; y: number; }
 export interface GridPos { gx: number; gy: number; }

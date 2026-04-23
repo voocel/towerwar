@@ -145,6 +145,12 @@ export function advanceAct() {
   // Drop baked meadow/forest tile image so next frame redraws with new waypoints.
   resetBackgroundCache();
 
+  // Small between-act heal so a narrow boss win doesn't doom the next act.
+  const healAmount = Math.min(ECONOMY.actHealLives, ECONOMY.startingLives - state.lives);
+  if (healAmount > 0) {
+    state.lives += healAmount;
+  }
+
   state.pendingActTransition = false;
 }
 

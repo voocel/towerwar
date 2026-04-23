@@ -7,6 +7,7 @@ import { isBuildable } from '@/config/map';
 import { TOWERS } from '@/config/towers';
 import { getActWaves } from '@/config/waves';
 import { ACTS, getActByIndex } from '@/config/maps';
+import { ECONOMY } from '@/config/economy';
 import { RELICS } from '@/config/relics';
 import type { TowerId } from '@/types';
 import { drawBackground } from './Background';
@@ -527,6 +528,12 @@ export class Renderer {
       `所有塔及等级将继承至下一幕 · 压在新路径上的塔会自动退款`,
       PLAY_WIDTH / 2, midY + 24,
     );
+    const healAmount = Math.min(ECONOMY.actHealLives, ECONOMY.startingLives - state.lives);
+    if (healAmount > 0) {
+      ctx.fillStyle = PALETTE.positive;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(`补给 · 生命 +${healAmount}`, PLAY_WIDTH / 2, midY + 44);
+    }
 
     // Next-act preview
     ctx.fillStyle = PALETTE.accentCool;
