@@ -6,17 +6,16 @@ export interface ReactionDef {
   name: string;
   sources: [ElementId, ElementId];
   damage: number;
-  aoeRadius?: number;
-  cooldownPerEnemy: number;
+  aoeRadius?: number;            // grid cells
+  cooldownPerEnemy: number;      // seconds
   color: string;
-  // effect flags
   vulnerableBonus?: number;
   vulnerableDuration?: number;
   freezeDuration?: number;
   chainDamage?: number;
   chainCount?: number;
   groundZoneDuration?: number;
-  groundZoneRadius?: number;
+  groundZoneRadius?: number;     // grid cells
   groundZoneDamagePerSec?: number;
   groundSlow?: number;
   spreadMarkCount?: number;

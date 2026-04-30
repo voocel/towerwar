@@ -1,56 +1,65 @@
-import { state } from '@/game/GameState';
-import type { Enemy } from '@/entities/Enemy';
+import * as Phaser from 'phaser';
 import type { ElementId } from '@/types';
+import type { Enemy } from '@/entities/Enemy';
+import type { GameContext, GroundZone } from '@/game/GameContext';
 import { findReaction, type ReactionDef } from '@/config/reactions';
 import { ELEMENTS } from '@/config/elements';
-import { CELL_SIZE, distSq } from '@/utils/Grid';export interface HitPayload {
+import { distSq, hexColor } from '@/utils/Grid';
+import { CELL_SIZE } from '@/constants';
+import { spawnReactionBurst, spawnBeam } from './FxSystem';
+import { onReactionTriggered, reactionDamageMultiplier } from './RelicSystem';
+
+/**
+ * Hit payload — what a projectile or chain hop applies on contact.
+ * Built by TargetingSystem.buildHitPayload(tower).
+ */
+export interface HitPayload {
   element: ElementId;
   damage: number;
   markChance: number;
-  markDuration?: number;        // pre-modified by formation bonuses
-  iceMarkAlsoSlows?: boolean;   // glacier: ice marks apply 10% slow
-  extraMark?: ElementId;        // reactor: poison also applies thunder
+  markDuration?: number;
+  iceMarkAlsoSlows?: boolean;
+  extraMark?: ElementId;
   isMagic?: boolean;
   dotDamage?: number;
   dotDuration?: number;
   slowAmount?: number;
   slowDuration?: number;
-  aoeRadiusPx?: number;         // pixels
+  aoeRadiusPx?: number;
 }
 
-export function applyHit(enemy: Enemy, hit: HitPayload) {
+export function applyHit(scene: Phaser.Scene, ctx: GameContext, enemy: Enemy, hit: HitPayload) {
   if (enemy.dead) return;
+  const time = ctx.time;
 
-  // AOE damage splash
+  // AOE splash
   if (hit.aoeRadiusPx) {
     const r2 = hit.aoeRadiusPx * hit.aoeRadiusPx;
-    for (const e of state.enemies) {
+    for (const e of ctx.enemies) {
       if (e.dead) continue;
-      if (distSq(e.pos, enemy.pos) > r2) continue;
-      const isTarget = e.id === enemy.id;
-      e.takeDamage(hit.damage, state.time, { isMagic: hit.isMagic });
+      if (distSq({ x: e.x, y: e.y }, { x: enemy.x, y: enemy.y }) > r2) continue;
+      e.takeDamage(hit.damage, time, { isMagic: hit.isMagic });
       if (hit.dotDamage && hit.dotDuration) e.applyDot(hit.dotDamage, hit.dotDuration, hit.element);
-      if (hit.slowAmount && hit.slowDuration) e.applySlow(hit.slowAmount, hit.slowDuration, state.time);
-      if (!isTarget) spawnFloater(e.pos, Math.round(hit.damage), ELEMENTS[hit.element].color);
+      if (hit.slowAmount && hit.slowDuration) e.applySlow(hit.slowAmount, hit.slowDuration, time);
     }
   } else {
-    enemy.takeDamage(hit.damage, state.time, { isMagic: hit.isMagic });
+    enemy.takeDamage(hit.damage, time, { isMagic: hit.isMagic });
     if (hit.dotDamage && hit.dotDuration) enemy.applyDot(hit.dotDamage, hit.dotDuration, hit.element);
-    if (hit.slowAmount && hit.slowDuration) enemy.applySlow(hit.slowAmount, hit.slowDuration, state.time);
+    if (hit.slowAmount && hit.slowDuration) enemy.applySlow(hit.slowAmount, hit.slowDuration, time);
   }
-
-  spawnFloater(enemy.pos, Math.round(hit.damage), ELEMENTS[hit.element].color);
 
   if (enemy.dead) return;
 
-  // Mark or reaction with primary element, then extra element
-  const reacted = markOrReact(enemy, hit.element, hit.markChance, hit.markDuration, hit.iceMarkAlsoSlows);
+  // Mark or react with primary element, then extra element
+  const reacted = markOrReact(scene, ctx, enemy, hit.element, hit.markChance, hit.markDuration, hit.iceMarkAlsoSlows);
   if (hit.extraMark && !reacted && !enemy.dead) {
-    markOrReact(enemy, hit.extraMark, 1.0, undefined, hit.iceMarkAlsoSlows);
+    markOrReact(scene, ctx, enemy, hit.extraMark, 1.0, undefined, hit.iceMarkAlsoSlows);
   }
 }
 
 function markOrReact(
+  scene: Phaser.Scene,
+  ctx: GameContext,
   enemy: Enemy,
   element: ElementId,
   chance: number,
@@ -62,186 +71,127 @@ function markOrReact(
     const r = findReaction(element, mark.element);
     if (!r) continue;
     if ((enemy.reactionCooldowns.get(r.id) ?? 0) > 0) continue;
-    triggerReaction(r, enemy, element);
+    triggerReaction(scene, ctx, r, enemy);
     enemy.removeMark(mark.element);
     enemy.reactionCooldowns.set(r.id, r.cooldownPerEnemy);
     return true;
   }
-  // Relic: brand — mark chance ×1.5
-  const effChance = state.ownedRelics.has('brand') ? Math.min(1, chance * 1.5) : chance;
-  if (Math.random() < effChance) {
-    let dur = duration ?? ELEMENTS[element].defaultMarkDuration;
-    // Relic: iceage — ice mark duration ×2
-    if (element === 'ice' && state.ownedRelics.has('iceage')) dur *= 2;
+  if (Math.random() < chance) {
+    const dur = duration ?? ELEMENTS[element].defaultMarkDuration;
     enemy.addMark(element, dur);
     if (element === 'ice' && iceMarkAlsoSlows) {
-      enemy.applySlow(0.10, dur, state.time);
+      enemy.applySlow(0.10, dur, ctx.time);
     }
   }
   return false;
 }
 
-function reactionDamageMultiplier(r: ReactionDef): number {
-  let mult = 1.0;
-  if (state.ownedRelics.has('master')) mult *= 1.2;
-  // Thunder-involved reactions: overload (fire+thunder), frostarc (ice+thunder), plague (thunder+poison)
-  if (state.ownedRelics.has('static') &&
-      (r.sources[0] === 'thunder' || r.sources[1] === 'thunder')) {
-    mult *= 1.5;
-  }
-  return mult;
-}
+function triggerReaction(scene: Phaser.Scene, ctx: GameContext, r: ReactionDef, target: Enemy) {
+  ctx.stats.reactionsTriggered++;
+  onReactionTriggered(ctx);
 
-function triggerReaction(r: ReactionDef, target: Enemy, incomingElement: ElementId) {
-  state.stats.reactionsTriggered++;
+  spawnReactionBurst(scene, target.x, target.y, r.color);
 
-  spawnReactionBurst(target, r);
+  const dmg = r.damage * reactionDamageMultiplier(ctx);
+  const time = ctx.time;
 
-  // Screen shake scaled by reaction damage
-  const shakeAmt = Math.min(10, r.damage / 15);
-  if (shakeAmt > state.shakeIntensity) state.shakeIntensity = shakeAmt;
-
-  if (state.ownedRelics.has('crystal')) {
-    state.gold += 2;
-    state.stats.goldEarned += 2;
-    spawnFloater({ x: target.pos.x, y: target.pos.y - 8 }, '+2💰', '#ffd93d');
-  }
-  if (state.ownedRelics.has('afterglow')) {
-    state.afterglowUntil = state.time + 1.0;
-  }
-
-  const dmgMult = reactionDamageMultiplier(r);
-  const dmg = r.damage * dmgMult;
-
-  const killedTargets: Enemy[] = [];
-
-  // Direct damage
+  // Direct damage (single or AOE)
   if (dmg > 0) {
     if (r.aoeRadius) {
-      const r2 = (r.aoeRadius * CELL_SIZE) * (r.aoeRadius * CELL_SIZE);
-      for (const e of state.enemies) {
+      const radPx = r.aoeRadius * CELL_SIZE;
+      const r2 = radPx * radPx;
+      for (const e of ctx.enemies) {
         if (e.dead) continue;
-        if (distSq(e.pos, target.pos) > r2) continue;
-        const before = e.dead;
-        e.takeDamage(dmg, state.time, { isMagic: true, isReaction: true });
-        spawnFloater(e.pos, Math.round(dmg), r.color);
-        if (!before && e.dead) killedTargets.push(e);
+        if (distSq({ x: e.x, y: e.y }, { x: target.x, y: target.y }) > r2) continue;
+        e.takeDamage(dmg, time, { isMagic: true, isReaction: true });
       }
     } else {
-      const before = target.dead;
-      target.takeDamage(dmg, state.time, { isMagic: true, isReaction: true });
-      spawnFloater(target.pos, Math.round(dmg), r.color);
-      if (!before && target.dead) killedTargets.push(target);
+      target.takeDamage(dmg, time, { isMagic: true, isReaction: true });
     }
   }
 
   // Vulnerable (steam)
   if (r.vulnerableBonus && r.vulnerableDuration) {
-    const rad = (r.aoeRadius ?? 1.5) * CELL_SIZE;
-    const r2 = rad * rad;
-    for (const e of state.enemies) {
+    const radPx = (r.aoeRadius ?? 1.5) * CELL_SIZE;
+    const r2 = radPx * radPx;
+    for (const e of ctx.enemies) {
       if (e.dead) continue;
-      if (distSq(e.pos, target.pos) > r2) continue;
-      e.applyVulnerable(r.vulnerableBonus, r.vulnerableDuration, state.time);
+      if (distSq({ x: e.x, y: e.y }, { x: target.x, y: target.y }) > r2) continue;
+      e.applyVulnerable(r.vulnerableBonus, r.vulnerableDuration, time);
     }
   }
 
-  if (r.freezeDuration) target.applyFreeze(r.freezeDuration, state.time);
+  // Freeze (frostarc)
+  if (r.freezeDuration) target.applyFreeze(r.freezeDuration, time);
 
+  // Chain (frostarc)
   if (r.chainDamage && r.chainCount) {
-    const cd = r.chainDamage * dmgMult;
-    const candidates = state.enemies
-      .filter(e => !e.dead && e.id !== target.id)
-      .map(e => ({ e, d: distSq(e.pos, target.pos) }))
+    const chainDmg = r.chainDamage * reactionDamageMultiplier(ctx);
+    const candidates = ctx.enemies
+      .filter(e => !e.dead && e.enemyId !== target.enemyId)
+      .map(e => ({ e, d: distSq({ x: e.x, y: e.y }, { x: target.x, y: target.y }) }))
       .sort((a, b) => a.d - b.d)
       .slice(0, r.chainCount);
     for (const c of candidates) {
-      const before = c.e.dead;
-      c.e.takeDamage(cd, state.time, { isMagic: true, isReaction: true });
-      spawnFloater(c.e.pos, Math.round(cd), r.color);
-      spawnBeam(target.pos, c.e.pos, r.color);
-      if (!before && c.e.dead) killedTargets.push(c.e);
+      c.e.takeDamage(chainDmg, time, { isMagic: true, isReaction: true });
+      spawnBeam(scene, target.x, target.y, c.e.x, c.e.y, r.color);
     }
   }
 
+  // Ground zone (toxicice)
   if (r.groundZoneDuration && r.groundZoneRadius !== undefined) {
-    state.groundZones.push({
-      pos: { ...target.pos },
+    const zone: GroundZone = {
+      x: target.x,
+      y: target.y,
       radiusPx: r.groundZoneRadius * CELL_SIZE,
       remainingTime: r.groundZoneDuration,
       damagePerSec: r.groundZoneDamagePerSec ?? 0,
       slow: r.groundSlow ?? 0,
       color: r.color,
-    });
+    };
+    ctx.groundZones.push(zone);
+    // Visual: persistent translucent disc.
+    const gfx = scene.add.graphics().setDepth(8);
+    gfx.fillStyle(hexColor(r.color), 0.25);
+    gfx.fillCircle(zone.x, zone.y, zone.radiusPx);
+    gfx.lineStyle(2, hexColor(r.color), 0.7);
+    gfx.strokeCircle(zone.x, zone.y, zone.radiusPx);
+    zone.gfx = gfx;
   }
 
+  // Spread mark (plague)
   if (r.spreadMarkCount && r.spreadMarkElement) {
-    const nearest = state.enemies
-      .filter(e => !e.dead && e.id !== target.id)
-      .map(e => ({ e, d: distSq(e.pos, target.pos) }))
+    const nearest = ctx.enemies
+      .filter(e => !e.dead && e.enemyId !== target.enemyId)
+      .map(e => ({ e, d: distSq({ x: e.x, y: e.y }, { x: target.x, y: target.y }) }))
       .sort((a, b) => a.d - b.d)
       .slice(0, r.spreadMarkCount);
     for (const c of nearest) {
       c.e.addMark(r.spreadMarkElement);
-      spawnBeam(target.pos, c.e.pos, r.color);
-    }
-  }
-
-  // Relic: chain — reaction kill marks nearest enemy with incoming element
-  if (killedTargets.length > 0 && state.ownedRelics.has('chain')) {
-    for (const killed of killedTargets) {
-      let nearest: Enemy | null = null;
-      let bestD = Infinity;
-      for (const e of state.enemies) {
-        if (e.dead || e.id === killed.id) continue;
-        const d = distSq(e.pos, killed.pos);
-        if (d < bestD) { nearest = e; bestD = d; }
-      }
-      if (nearest) {
-        nearest.addMark(incomingElement);
-        spawnBeam(killed.pos, nearest.pos, ELEMENTS[incomingElement].color);
-      }
+      spawnBeam(scene, target.x, target.y, c.e.x, c.e.y, r.color);
     }
   }
 }
 
-function spawnFloater(pos: { x: number; y: number }, value: number | string, color: string) {
-  state.floaters.push({
-    pos: { x: pos.x + (Math.random() - 0.5) * 8, y: pos.y - 6 },
-    text: typeof value === 'number' ? `${value}` : value,
-    color,
-    remainingTime: 0.9,
-    vy: -28,
-  });
-}
-
-function spawnReactionBurst(target: Enemy, r: ReactionDef) {
-  const n = 12;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    const speed = 80 + Math.random() * 80;
-    state.particles.push({
-      pos: { ...target.pos },
-      vel: { x: Math.cos(a) * speed, y: Math.sin(a) * speed },
-      color: r.color,
-      remainingTime: 0.5,
-      life: 0.5,
-      radius: 3 + Math.random() * 2,
-    });
+/** Per-frame: tick ground zones (damage + slow) and remove expired ones. */
+export function updateGroundZones(ctx: GameContext, dt: number) {
+  for (const z of ctx.groundZones) {
+    z.remainingTime -= dt;
+    const r2 = z.radiusPx * z.radiusPx;
+    for (const e of ctx.enemies) {
+      if (e.dead) continue;
+      const dx = e.x - z.x;
+      const dy = e.y - z.y;
+      if (dx * dx + dy * dy > r2) continue;
+      if (z.damagePerSec > 0) {
+        e.takeDamage(z.damagePerSec * dt, ctx.time, { isMagic: true });
+      }
+      if (z.slow > 0) {
+        e.applySlow(z.slow, 0.4, ctx.time);  // refresh continuously while inside
+      }
+    }
   }
-}
-
-function spawnBeam(a: { x: number; y: number }, b: { x: number; y: number }, color: string) {
-  const steps = 8;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    state.particles.push({
-      pos: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t },
-      vel: { x: 0, y: 0 },
-      color,
-      remainingTime: 0.25,
-      life: 0.25,
-      radius: 3,
-    });
-  }
+  const expired = ctx.groundZones.filter(z => z.remainingTime <= 0);
+  for (const z of expired) z.gfx?.destroy();
+  ctx.groundZones = ctx.groundZones.filter(z => z.remainingTime > 0);
 }

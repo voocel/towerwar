@@ -1,4 +1,4 @@
-import { state } from '@/game/GameState';
+import type { GameContext } from '@/game/GameContext';
 import type { Tower } from '@/entities/Tower';
 
 function isAdjacent(a: Tower, b: Tower): boolean {
@@ -7,10 +7,14 @@ function isAdjacent(a: Tower, b: Tower): boolean {
   return (dx + dy) > 0 && dx <= 1 && dy <= 1;
 }
 
-export function recomputeFormations() {
-  for (const t of state.towers) t.formations.clear();
+/**
+ * Recompute formation membership for all towers. Call after any
+ * placement / sale / upgrade.
+ */
+export function recomputeFormations(ctx: GameContext) {
+  for (const t of ctx.towers) t.formations.clear();
 
-  const towers = state.towers;
+  const towers = ctx.towers;
   for (let i = 0; i < towers.length; i++) {
     for (let j = i + 1; j < towers.length; j++) {
       const a = towers[i];

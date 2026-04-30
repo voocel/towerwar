@@ -115,3 +115,13 @@ export function withAlpha(hex: string, a: number): string {
   return hex;
 }
 
+/** Look up the hover/hot variant of a known button color, fall back to bg4. */
+export function brighten(hex: string): string {
+  const map: Record<string, string> = {
+    [PALETTE.btnStart]:   PALETTE.btnStartHot,
+    [PALETTE.btnUpgrade]: PALETTE.btnUpgradeHot,
+    [PALETTE.btnSell]:    PALETTE.btnSellHot,
+  };
+  return map[hex] ?? PALETTE.bg4;
+}
+

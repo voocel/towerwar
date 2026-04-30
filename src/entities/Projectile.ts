@@ -1,71 +1,69 @@
-import type { Vec2, ElementId } from '@/types';
+import * as Phaser from 'phaser';
 import type { Enemy } from './Enemy';
+import type { HitPayload } from '@/systems/ReactionSystem';
+import type { GameContext } from '@/game/GameContext';
+import { applyHit } from '@/systems/ReactionSystem';
+import { hexColor } from '@/utils/Grid';
+import { DPR, px } from '@/constants';
 
-export class Projectile {
-  static nextId = 0;
-  id: number;
-  pos: Vec2;
+export interface ProjectileConfig {
   speed: number;
-  damage: number;
-  element: ElementId;
-  markChance: number;
   color: string;
-  radius: number;
   target: Enemy;
-  aoeRadiusPx?: number;
-  dotDamage?: number;
-  dotDuration?: number;
-  slowAmount?: number;
-  slowDuration?: number;
-  extraMark?: ElementId;     // formation reactor: poison tower also applies thunder mark
-  markDuration?: number;     // formation-adjusted mark duration
-  iceMarkAlsoSlows?: boolean;// glacier: ice marks apply 10% slow
-  alive: boolean = true;
+  hit: HitPayload;
+}
 
-  constructor(opts: {
-    pos: Vec2; speed: number; damage: number; element: ElementId;
-    markChance: number; color: string; radius?: number; target: Enemy;
-    aoeRadiusPx?: number;
-    dotDamage?: number; dotDuration?: number;
-    slowAmount?: number; slowDuration?: number;
-    extraMark?: ElementId;
-    markDuration?: number;
-    iceMarkAlsoSlows?: boolean;
-  }) {
-    this.id = Projectile.nextId++;
-    this.pos = { ...opts.pos };
-    this.speed = opts.speed;
-    this.damage = opts.damage;
-    this.element = opts.element;
-    this.markChance = opts.markChance;
-    this.color = opts.color;
-    this.radius = opts.radius ?? 4;
-    this.target = opts.target;
-    this.aoeRadiusPx = opts.aoeRadiusPx;
-    this.dotDamage = opts.dotDamage;
-    this.dotDuration = opts.dotDuration;
-    this.slowAmount = opts.slowAmount;
-    this.slowDuration = opts.slowDuration;
-    this.extraMark = opts.extraMark;
-    this.markDuration = opts.markDuration;
-    this.iceMarkAlsoSlows = opts.iceMarkAlsoSlows;
+export class Projectile extends Phaser.GameObjects.Container {
+  alive: boolean = true;
+  speed: number;
+  target: Enemy;
+  hit: HitPayload;
+
+  private core: Phaser.GameObjects.Arc;
+  private glow: Phaser.GameObjects.Arc;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, cfg: ProjectileConfig) {
+    super(scene, x, y);
+    this.speed = cfg.speed * DPR;        // bulletSpeed in def is logical px/s
+    this.target = cfg.target;
+    this.hit = cfg.hit;
+
+    const c = hexColor(cfg.color);
+    this.glow = scene.add.circle(0, 0, px(8), c, 0.35);
+    this.core = scene.add.circle(0, 0, px(3.5), 0xffffff);
+    this.core.setStrokeStyle(1.5, c);
+    this.add([this.glow, this.core]);
+
+    scene.add.existing(this);
+    this.setDepth(25);
   }
 
-  update(dt: number): boolean {
+  /** Returns true if hit landed this frame. */
+  step(scene: Phaser.Scene, ctx: GameContext, dt: number): boolean {
     if (!this.alive) return false;
     if (this.target.dead || this.target.reachedEnd) {
-      this.alive = false;
+      this.kill();
       return false;
     }
-    const dx = this.target.pos.x - this.pos.x;
-    const dy = this.target.pos.y - this.pos.y;
+    const dx = this.target.x - this.x;
+    const dy = this.target.y - this.y;
     const d = Math.sqrt(dx * dx + dy * dy);
     const step = this.speed * dt;
-    if (step >= d) {
-      this.pos = { ...this.target.pos };
-      return true;  // hit
+    const hitRadius = this.target.def.radius * DPR;
+    if (step >= d || d < hitRadius) {
+      applyHit(scene, ctx, this.target, this.hit);
+      this.kill();
+      return true;
     }
-    this.pos = { x: this.pos.x + dx / d * step, y: this.pos.y + dy / d * step };
+    if (d > 0) {
+      this.x += dx / d * step;
+      this.y += dy / d * step;
+    }
     return false;
+  }
+
+  kill() {
+    this.alive = false;
+    this.destroy();
   }
 }

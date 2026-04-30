@@ -1,48 +1,52 @@
-import { state } from '@/game/GameState';
+import * as Phaser from 'phaser';
 import type { Tower } from '@/entities/Tower';
 import type { Enemy } from '@/entities/Enemy';
 import { Projectile } from '@/entities/Projectile';
+import type { GameContext } from '@/game/GameContext';
+import { distSq, findNearestEnemy } from '@/utils/Grid';
+import { CELL_SIZE } from '@/constants';
 import { ELEMENTS } from '@/config/elements';
-import { CELL_SIZE, distSq } from '@/utils/Grid';
 import { applyHit, type HitPayload } from './ReactionSystem';
+import { spawnBeam } from './FxSystem';
+import { markChanceMultiplier, attackDamageMultiplier } from './RelicSystem';
 
-function pickTarget(tower: Tower): Enemy | null {
-  // Target the enemy nearest to the end (highest waypointIndex + distance covered)
+function pickTarget(tower: Tower, enemies: Enemy[]): Enemy | null {
   const r2 = tower.rangePx * tower.rangePx;
   let best: Enemy | null = null;
   let bestScore = -Infinity;
-  for (const e of state.enemies) {
+  const towerPos = { x: tower.x, y: tower.y };
+  for (const e of enemies) {
     if (e.dead || e.reachedEnd) continue;
-    if (e.def.flying && tower.towerId !== 'arc' && tower.towerId !== 'magstorm' && tower.towerId !== 'spark') {
-      // Only certain towers hit flying enemies (MVP rule for the flying wave).
-      continue;
+    if (e.def.flying && !tower.def.canHitFlying) continue;
+    const d2 = distSq({ x: e.x, y: e.y }, towerPos);
+    if (d2 > r2) continue;
+    let score: number;
+    switch (tower.strategy) {
+      case 'first':     score = e.waypointIndex * 10000 - d2 / 1000; break;
+      case 'last':      score = -e.waypointIndex * 10000 + d2 / 1000; break;
+      case 'strongest': score = e.hp; break;
+      case 'weakest':   score = -e.hp; break;
+      case 'nearest':   score = -d2; break;
     }
-    if (distSq(e.pos, tower.pos) > r2) continue;
-    const score = e.waypointIndex * 10000 - distSq(e.pos, tower.pos) / 1000;
     if (score > bestScore) { best = e; bestScore = score; }
   }
   return best;
 }
 
-function buildHitPayload(tower: Tower): HitPayload {
-  const resMult = state.ownedRelics.has('resonance') ? 1.5 : 1.0;
-  const afterglow = state.time < state.afterglowUntil ? 1.25 : 1.0;
-  const pathogen = state.ownedRelics.has('pathogen') ? 1.5 : 1.0;
-
+function buildHitPayload(ctx: GameContext, tower: Tower): HitPayload {
   const payload: HitPayload = {
     element: tower.def.element,
-    damage: tower.damage * afterglow,
-    markChance: tower.markChance,
+    damage: tower.damage * attackDamageMultiplier(ctx),
+    markChance: Math.min(1, tower.markChance * markChanceMultiplier(ctx)),
     markDuration: ELEMENTS[tower.def.element].defaultMarkDuration,
   };
 
-  // Formation modifiers — optionally scaled by resonance relic
+  // Formation modifiers
   if (tower.def.element === 'fire' && tower.formations.has('inferno')) {
-    // Base +50% duration; with resonance +75%
-    payload.markDuration = (payload.markDuration ?? 5) * (1 + 0.5 * resMult);
+    payload.markDuration = (payload.markDuration ?? 5) * 1.5;
   }
   if (tower.def.element === 'ice' && tower.formations.has('glacier')) {
-    payload.markChance = Math.min(1, payload.markChance + 0.25 * resMult);
+    payload.markChance = Math.min(1, payload.markChance + 0.25);
     payload.iceMarkAlsoSlows = true;
   }
   if (tower.def.element === 'poison' && tower.formations.has('reactor')) {
@@ -50,7 +54,7 @@ function buildHitPayload(tower: Tower): HitPayload {
   }
 
   if (tower.def.dotDamage && tower.def.dotDuration) {
-    payload.dotDamage = tower.dotDamage * pathogen;
+    payload.dotDamage = tower.dotDamage;
     payload.dotDuration = tower.def.dotDuration;
   }
   if (tower.def.slowAmount && tower.def.slowDuration) {
@@ -60,90 +64,73 @@ function buildHitPayload(tower: Tower): HitPayload {
   if (tower.aoeRadius !== undefined) {
     payload.aoeRadiusPx = tower.aoeRadius * CELL_SIZE;
   }
-  if (tower.magstormGridAoe > 0) {
-    const r = tower.magstormGridAoe * resMult;
-    payload.aoeRadiusPx = r * CELL_SIZE;
-  }
 
   return payload;
 }
 
-function fireArc(tower: Tower, first: Enemy) {
-  const resMult = state.ownedRelics.has('resonance') ? 1.5 : 1.0;
-  // Base arc chain count is 2 extra (+3 total hits); formation grid adds 1; resonance scales the bonus
-  const gridBonus = tower.formations.has('grid') ? Math.round(1 * resMult) : 0;
+// Arc tower chain: damage multiplier per successive hop, capped tail uses last entry.
+const ARC_CHAIN_DECAY = [1.0, 0.7, 0.5, 0.35, 0.25];
+const ARC_HOP_RANGE_GRID = 3;
+
+/**
+ * Arc tower fires an instant chain instead of a projectile.
+ * Damage decays per hop; "grid" formation grants +1 jump.
+ */
+function fireArc(scene: Phaser.Scene, ctx: GameContext, tower: Tower, first: Enemy) {
+  const gridBonus = tower.formations.has('grid') ? 1 : 0;
   const jumps = 1 + (tower.def.chainCount ?? 2) + gridBonus;
-  const hit = buildHitPayload(tower);
-  const damages = [hit.damage, hit.damage * 0.7, hit.damage * 0.5, hit.damage * 0.35, hit.damage * 0.25];
-  let current: Enemy | null = first;
+  const base = buildHitPayload(ctx, tower);
+  const hopRangePx = ARC_HOP_RANGE_GRID * CELL_SIZE;
+  const hopMaxDistSq = hopRangePx * hopRangePx;
   const visited = new Set<number>();
-  let from = { ...tower.pos };
+  let current: Enemy | null = first;
+  let fromX = tower.x;
+  let fromY = tower.y;
+
   for (let i = 0; i < jumps && current; i++) {
-    visited.add(current.id);
-    const localHit = { ...hit, damage: damages[i] ?? damages[damages.length - 1] };
-    applyHit(current, localHit);
-    state.particles.push({
-      pos: { x: from.x, y: from.y },
-      vel: { x: 0, y: 0 },
-      color: tower.def.color,
-      remainingTime: 0.15, life: 0.15, radius: 4,
-    });
-    const steps = 6;
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      state.particles.push({
-        pos: { x: from.x + (current.pos.x - from.x) * t, y: from.y + (current.pos.y - from.y) * t },
-        vel: { x: 0, y: 0 }, color: tower.def.color,
-        remainingTime: 0.1, life: 0.1, radius: 2,
-      });
-    }
-    from = { ...current.pos };
-    let next: Enemy | null = null;
-    let bestD = Infinity;
-    for (const e of state.enemies) {
-      if (e.dead || e.reachedEnd || visited.has(e.id)) continue;
-      const d = distSq(e.pos, current.pos);
-      if (d < bestD && d < (3 * CELL_SIZE) * (3 * CELL_SIZE)) { next = e; bestD = d; }
-    }
-    current = next;
+    visited.add(current.enemyId);
+    const decay = ARC_CHAIN_DECAY[i] ?? ARC_CHAIN_DECAY[ARC_CHAIN_DECAY.length - 1];
+    const localHit: HitPayload = { ...base, damage: base.damage * decay };
+    spawnBeam(scene, fromX, fromY, current.x, current.y, tower.def.color, 200);
+    applyHit(scene, ctx, current, localHit);
+    fromX = current.x;
+    fromY = current.y;
+
+    current = findNearestEnemy(ctx.enemies, current.x, current.y, hopMaxDistSq, e => visited.has(e.enemyId));
   }
 }
 
-export function updateTowers(dt: number) {
-  for (const tower of state.towers) {
+export function updateTowers(scene: Phaser.Scene, ctx: GameContext, dt: number) {
+  for (const tower of ctx.towers) {
     tower.attackTimer -= dt;
     if (tower.attackTimer > 0) continue;
 
-    const target = pickTarget(tower);
+    const target = pickTarget(tower, ctx.enemies);
     if (!target) continue;
 
-    const dx = target.pos.x - tower.pos.x;
-    const dy = target.pos.y - tower.pos.y;
-    tower.aimAngle = Math.atan2(dy, dx);
+    const dx = target.x - tower.x;
+    const dy = target.y - tower.y;
+    tower.setAimAngle(Math.atan2(dy, dx));
     tower.attackTimer = tower.attackPeriod;
 
     if (tower.towerId === 'arc') {
-      fireArc(tower, target);
+      fireArc(scene, ctx, tower, target);
       continue;
     }
 
-    const hit = buildHitPayload(tower);
-    state.projectiles.push(new Projectile({
-      pos: { ...tower.pos },
-      speed: tower.def.bulletSpeed ?? 800,
-      damage: hit.damage,
-      element: hit.element,
-      markChance: hit.markChance,
+    const hit = buildHitPayload(ctx, tower);
+    const speed = tower.def.bulletSpeed ?? 800;
+    const proj = new Projectile(scene, tower.x, tower.y, {
+      speed,
       color: tower.def.color,
       target,
-      aoeRadiusPx: hit.aoeRadiusPx,
-      dotDamage: hit.dotDamage,
-      dotDuration: hit.dotDuration,
-      slowAmount: hit.slowAmount,
-      slowDuration: hit.slowDuration,
-      extraMark: hit.extraMark,
-      markDuration: hit.markDuration,
-      iceMarkAlsoSlows: hit.iceMarkAlsoSlows,
-    }));
+      hit,
+    });
+    ctx.projectiles.push(proj);
   }
+}
+
+export function updateProjectiles(scene: Phaser.Scene, ctx: GameContext, dt: number) {
+  for (const p of ctx.projectiles) p.step(scene, ctx, dt);
+  ctx.projectiles = ctx.projectiles.filter(p => p.alive);
 }

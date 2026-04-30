@@ -3,35 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TowerWar - 元素反应塔防</title>
+    <title>TowerWar · 元素反应塔防</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
         width: 100%;
         height: 100%;
-        background: #0f1a0c;
+        background: #0a0c10;
         color: #adb4c1;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         overflow: hidden;
         user-select: none;
       }
-      #app {
-        width: 100%;
-        height: 100%;
+      #game {
+        width: 100vw;
+        height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
       }
-      #game-canvas {
-        cursor: crosshair;
+      #game canvas {
         box-shadow: 0 0 60px rgba(47, 66, 38, 0.35), 0 0 20px rgba(0, 0, 0, 0.6);
       }
     </style>
   </head>
   <body>
-    <div id="app">
-      <canvas id="game-canvas" width="1000" height="576"></canvas>
-    </div>
+    <div id="game"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

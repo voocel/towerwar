@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <defs>
+    
+  <radialGradient id="baseGrad" cx="50%" cy="35%" r="65%">
+    <stop offset="0%" stop-color="#3a4250"/>
+    <stop offset="60%" stop-color="#252a36"/>
+    <stop offset="100%" stop-color="#13161e"/>
+  </radialGradient>
+  <radialGradient id="baseShadow" cx="50%" cy="50%" r="55%">
+    <stop offset="0%" stop-color="#000" stop-opacity="0.55"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+    <radialGradient id="sparkCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#ffe680"/>
+      <stop offset="100%" stop-color="#7a5a18"/>
+    </radialGradient>
+    <linearGradient id="copper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8a458"/>
+      <stop offset="100%" stop-color="#7a4218"/>
+    </linearGradient>
+  </defs>
+  
+  <ellipse cx="48" cy="86" rx="36" ry="6" fill="url(#baseShadow)"/>
+  <polygon points="61.01,18.59 79.41,36.99 79.41,63.01 61.01,81.41 34.99,81.41 16.59,63.01 16.59,36.99 34.99,18.59" fill="url(#baseGrad)" stroke="#0c0e14" stroke-width="2"/>
+  <polygon points="61.01,18.59 79.41,36.99 79.41,63.01 61.01,81.41 34.99,81.41 16.59,63.01 16.59,36.99 34.99,18.59" fill="none" stroke="#5a6478" stroke-width="0.8" opacity="0.55"/>
+  <!-- 4 electrode posts -->
+  <g fill="url(#copper)" stroke="#3a1a0c" stroke-width="0.7">
+    <circle cx="63.6" cy="63.6" r="3.5"/>
+    <circle cx="32.4" cy="63.6" r="3.5"/>
+    <circle cx="32.4" cy="32.4" r="3.5"/>
+    <circle cx="63.6" cy="32.4" r="3.5"/>
+  </g>
+  <!-- coil ring outer -->
+  <circle cx="48" cy="48" r="20" fill="none" stroke="url(#copper)" stroke-width="3"/>
+  <circle cx="48" cy="48" r="20" fill="none" stroke="#3a1a0c" stroke-width="0.6"/>
+  <!-- coil ring middle -->
+  <circle cx="48" cy="48" r="14" fill="none" stroke="url(#copper)" stroke-width="2.5"/>
+  <circle cx="48" cy="48" r="14" fill="none" stroke="#3a1a0c" stroke-width="0.5"/>
+  <!-- arc traces between electrodes -->
+  <g stroke="#ffe680" stroke-width="1" fill="none" opacity="0.7" stroke-linecap="round">
+    <path d="M 31 31 Q 38 36 41 33"/>
+    <path d="M 65 31 Q 58 36 55 33"/>
+    <path d="M 31 65 Q 38 60 41 63"/>
+    <path d="M 65 65 Q 58 60 55 63"/>
+  </g>
+  <!-- bright central spark -->
+  <circle cx="48" cy="48" r="6" fill="url(#sparkCore)"/>
+  <circle cx="48" cy="48" r="2.5" fill="#ffffff"/>
+  <!-- outer rim glow -->
+  <circle cx="48" cy="48" r="28" fill="none" stroke="#ffe680" stroke-width="0.8" opacity="0.35"/>
+</svg>

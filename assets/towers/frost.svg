@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <defs>
+    
+  <radialGradient id="baseGrad" cx="50%" cy="35%" r="65%">
+    <stop offset="0%" stop-color="#3a4250"/>
+    <stop offset="60%" stop-color="#252a36"/>
+    <stop offset="100%" stop-color="#13161e"/>
+  </radialGradient>
+  <radialGradient id="baseShadow" cx="50%" cy="50%" r="55%">
+    <stop offset="0%" stop-color="#000" stop-opacity="0.55"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+    <radialGradient id="iceCore" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#a0e0f5"/>
+      <stop offset="100%" stop-color="#2a5a78"/>
+    </radialGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9ab0c4"/>
+      <stop offset="100%" stop-color="#445466"/>
+    </linearGradient>
+  </defs>
+  
+  <ellipse cx="48" cy="86" rx="36" ry="6" fill="url(#baseShadow)"/>
+  <polygon points="61.01,18.59 79.41,36.99 79.41,63.01 61.01,81.41 34.99,81.41 16.59,63.01 16.59,36.99 34.99,18.59" fill="url(#baseGrad)" stroke="#0c0e14" stroke-width="2"/>
+  <polygon points="61.01,18.59 79.41,36.99 79.41,63.01 61.01,81.41 34.99,81.41 16.59,63.01 16.59,36.99 34.99,18.59" fill="none" stroke="#5a6478" stroke-width="0.8" opacity="0.55"/>
+  <!-- steel rim -->
+  <circle cx="48" cy="48" r="24" fill="url(#steel)" stroke="#1c2734" stroke-width="1.5"/>
+  <circle cx="48" cy="48" r="24" fill="none" stroke="#cde0ec" stroke-width="0.8" opacity="0.55"/>
+  <!-- 6 ice shards radiating outward -->
+  <g fill="#cde9f5" stroke="#3a6a86" stroke-width="0.6">
+    <polygon points="48.0,18.0 52.3,24.4 48.0,26.0 43.7,24.4"/>
+    <polygon points="74.0,33.0 70.6,39.9 67.1,37.0 66.3,32.5"/>
+    <polygon points="74.0,63.0 66.3,63.5 67.1,59.0 70.6,56.1"/>
+    <polygon points="48.0,78.0 43.7,71.6 48.0,70.0 52.3,71.6"/>
+    <polygon points="22.0,63.0 25.4,56.1 28.9,59.0 29.7,63.5"/>
+    <polygon points="22.0,33.0 29.7,32.5 28.9,37.0 25.4,39.9"/>
+  </g>
+  <!-- hexagonal crystal -->
+  <polygon points="48,33 61,40.5 61,55.5 48,63 35,55.5 35,40.5"
+           fill="url(#iceCore)" stroke="#4a8aa8" stroke-width="1.2"/>
+  <!-- inner facet highlight -->
+  <polygon points="48,38 56,42 48,48 40,42" fill="#ffffff" opacity="0.7"/>
+  <!-- outer rim glow -->
+  <circle cx="48" cy="48" r="32" fill="none" stroke="#a0e0f5" stroke-width="0.8" opacity="0.3"/>
+</svg>
