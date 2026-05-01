@@ -152,8 +152,12 @@ function snapshotFromRegistry(reg: Phaser.Data.DataManager): SaveSnapshot {
 
 // ─── chapter-level victory + stardust award ───────────────────────────────
 
-const STARDUST_PER_STAR = [0, 10, 20, 35];   // index = star count
-const FIRST_CLEAR_BONUS = 50;
+// Stardust award per chapter clear, indexed by star count.
+// Tuned so that a first-clear at ★1 (60 → now 100) covers the cheapest
+// store tower (80), giving the player at least one purchase decision after
+// their first run.
+const STARDUST_PER_STAR = [0, 20, 40, 70];   // index = star count
+const FIRST_CLEAR_BONUS = 80;
 
 /**
  * Persist a chapter victory:

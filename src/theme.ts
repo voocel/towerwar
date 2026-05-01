@@ -100,6 +100,12 @@ export const PALETTE = {
   toxiciceColor:  '#7fa686',  // sea-foam
   plagueColor:    '#b0a840',  // bile gold
 
+  // ── Tower rarity (visual ladder for the meta-store) ──
+  rarityCommon:    '#9aa3b2',  // soft steel — base
+  rarityRare:      '#5eb0c5',  // teal — an upgrade
+  rarityEpic:      '#b074d4',  // amethyst — clearly premium
+  rarityLegendary: '#e8b04d',  // warm gold — top tier
+
   // ── Grid/lines ──
   gridDot:  'rgba(228,233,239,0.045)',
   divider:  '#2a303a',

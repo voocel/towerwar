@@ -10,7 +10,7 @@ import { GameContext } from '@/game/GameContext';
 import { getLevel } from '@/data/levels';
 import { CHAPTERS, type ChapterId } from '@/data/chapters';
 import { Tower } from '@/entities/Tower';
-import { TOWERS } from '@/config/towers';
+import { TOWERS, RARITY_COLOR } from '@/config/towers';
 import type { TowerId } from '@/types';
 import {
   canStartWave, startNextWave, updateWave, updateWaveAutoStart,
@@ -22,6 +22,7 @@ import { recomputeFormations } from '@/systems/FormationSystem';
 import { castMeteor, castFrostNova, castLightning, isSkillReady, skillCooldownRatio, updateSkills } from '@/systems/SkillSystem';
 import { resolveNode as applyNode } from '@/systems/RelicSystem';
 import { applyEquippedTalents } from '@/systems/TalentSystem';
+import { isTowerUnlocked } from '@/systems/SaveSystem';
 import type { TalentId } from '@/types';
 import { RELICS } from '@/config/relics';
 import { SKILLS } from '@/config/skills';
@@ -221,16 +222,38 @@ export class GameScene extends Phaser.Scene {
     const def = TOWERS[ctx.selectedTowerToPlace];
     const occupied = ctx.towers.some(t => t.grid.gx === gp.gx && t.grid.gy === gp.gy);
     const onPath = isPathCell(ctx.pathSet, gp.gx, gp.gy);
-    const valid = !occupied && !onPath && ctx.gold >= def.cost;
+    const broke = ctx.gold < def.cost;
+    const valid = !occupied && !onPath && !broke;
 
-    const color = valid ? hexColor(def.color) : hexColor(PALETTE.danger);
-    this.placementGfx.fillStyle(color, 0.18);
+    // Use semantic colors that never collide with the tower's own hue:
+    //   - GREEN (positive) → can place here
+    //   - RED   (danger)   → blocked (occupied / on path / cost > gold)
+    // The range circle still uses the tower's color so players recognize
+    // *which* tower is on the cursor.
+    const stateColor = valid ? hexColor(PALETTE.positive) : hexColor(PALETTE.danger);
+    const rangeColor = hexColor(def.color);
+
+    // Cell highlight — denser fill + thicker stroke when invalid so the
+    // "no" reading is unmistakable even at a glance.
+    this.placementGfx.fillStyle(stateColor, valid ? 0.22 : 0.30);
     this.placementGfx.fillRect(gp.gx * CELL_SIZE, gp.gy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    this.placementGfx.lineStyle(1.5, color, 0.9);
+    this.placementGfx.lineStyle(valid ? 1.5 : 2.2, stateColor, 0.95);
     this.placementGfx.strokeRect(gp.gx * CELL_SIZE + px(1), gp.gy * CELL_SIZE + px(1), CELL_SIZE - px(2), CELL_SIZE - px(2));
 
+    // Invalid placements get an explicit ✕ glyph in the cell — strongest
+    // possible signal that "you cannot put it here".
+    if (!valid) {
+      const cx = gp.gx * CELL_SIZE + CELL_SIZE / 2;
+      const cy = gp.gy * CELL_SIZE + CELL_SIZE / 2;
+      const r = CELL_SIZE * 0.28;
+      this.placementGfx.lineStyle(2.5, stateColor, 0.95);
+      this.placementGfx.lineBetween(cx - r, cy - r, cx + r, cy + r);
+      this.placementGfx.lineBetween(cx - r, cy + r, cx + r, cy - r);
+    }
+
+    // Range circle — always shown in the tower's element color (identity).
     const center = gridToPixel(gp.gx, gp.gy);
-    this.placementGfx.lineStyle(1.5, color, 0.5);
+    this.placementGfx.lineStyle(1.5, rangeColor, 0.5);
     this.placementGfx.strokeCircle(center.x, center.y, def.range * CELL_SIZE);
   }
 
@@ -278,12 +301,15 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'sans-serif', fontSize: '11px', color: PALETTE.accentRose,
     });
 
-    // Tower picker — 2 columns × N rows (compact for 8 towers)
+    // Tower picker — 2 columns × N rows (compact for 8 towers).
+    // Filter to towers the player has actually unlocked from the meta-store;
+    // chapter `allowedTowers` is the *upper bound* per chapter.
     const labelY = px(150);
     this.add.text(sx, labelY, '建塔', {
       fontFamily: 'sans-serif', fontSize: '12px', color: PALETTE.textDim,
     });
-    const ids = ctx.level.allowedTowers;
+    const ids = ctx.level.allowedTowers.filter(id => isTowerUnlocked(this.registry, id));
+    const lockedCount = ctx.level.allowedTowers.length - ids.length;
     const colW = (HUD_WIDTH - px(40) - px(8)) / 2;
     const rowH = px(44);
     const towerRows = Math.ceil(ids.length / 2);
@@ -294,7 +320,14 @@ export class GameScene extends Phaser.Scene {
       const by = labelY + px(18) + row * (rowH + px(6));
       this.makeTowerButton(ids[i], bx, by, colW, rowH);
     }
-    const towerEndY = labelY + px(18) + towerRows * (rowH + px(6));
+    let towerEndY = labelY + px(18) + towerRows * (rowH + px(6));
+    // Hint about locked towers — nudge the player toward the meta-store.
+    if (lockedCount > 0) {
+      this.add.text(sx, towerEndY, `+${lockedCount} 个锁定塔 · 章节页 ⭐ 商店解锁`, {
+        fontFamily: 'sans-serif', fontSize: '10px', color: PALETTE.textFaint,
+      });
+      towerEndY += px(14);
+    }
 
     // Skill row (only if level grants any). Stack vertically.
     let nextY = towerEndY + px(8);
@@ -477,8 +510,9 @@ export class GameScene extends Phaser.Scene {
 
   private makeTowerButton(id: TowerId, x: number, y: number, w: number, h: number) {
     const def = TOWERS[id];
+    const rarityColor = RARITY_COLOR[def.rarity];
     const bg = this.add.rectangle(x, y, w, h, hexColor(PALETTE.bg2)).setOrigin(0, 0);
-    bg.setStrokeStyle(1, hexColor(PALETTE.divider));
+    bg.setStrokeStyle(1, hexColor(rarityColor), 0.55);
     bg.setInteractive({ useHandCursor: true });
 
     // Prefer the loaded SVG sprite; fall back to a colored dot if missing.
@@ -502,12 +536,12 @@ export class GameScene extends Phaser.Scene {
 
     bg.on('pointerover', () => {
       bg.setFillStyle(hexColor(PALETTE.bg3));
-      bg.setStrokeStyle(2, hexColor(def.color));
+      bg.setStrokeStyle(2, hexColor(rarityColor));
     });
     bg.on('pointerout', () => {
       const selected = this.ctx.selectedTowerToPlace === id;
       bg.setFillStyle(hexColor(selected ? PALETTE.bg4 : PALETTE.bg2));
-      bg.setStrokeStyle(selected ? 2 : 1, hexColor(selected ? def.color : PALETTE.divider));
+      bg.setStrokeStyle(selected ? 2 : 1, hexColor(rarityColor), selected ? 1 : 0.55);
     });
     bg.on('pointerdown', () => {
       if (this.ctx.gold >= def.cost) {

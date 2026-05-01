@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { SCENES, GAME_WIDTH, GAME_HEIGHT, REGISTRY_KEYS, px } from '@/constants';
 import { PALETTE, brighten } from '@/theme';
 import { hexColor } from '@/utils/Grid';
-import { TOWERS } from '@/config/towers';
+import { TOWERS, RARITY_COLOR, RARITY_LABEL } from '@/config/towers';
 import { TOWER_PRICES, DEFAULT_UNLOCKED_TOWERS } from '@/config/towerPrices';
 import { TALENTS, TALENT_ORDER } from '@/config/talents';
 import {
@@ -142,9 +142,12 @@ export class StoreScene extends Phaser.Scene {
     const def = TOWERS[id];
     const cost = TOWER_PRICES[id];
     const owned = isTowerUnlocked(this.registry, id);
+    const rarityColor = RARITY_COLOR[def.rarity];
 
     const bg = this.add.rectangle(x, y, w, h, hexColor(PALETTE.bg2)).setOrigin(0);
-    bg.setStrokeStyle(1, hexColor(owned ? PALETTE.accentMint : def.color));
+    // Owned cards get a mint outline; unowned cards get a rarity-tinted outline
+    // so the price tier reads visually before reading the number.
+    bg.setStrokeStyle(owned ? 1 : 2, hexColor(owned ? PALETTE.accentMint : rarityColor));
     this.listContainer.add(bg);
 
     // Icon
@@ -160,14 +163,24 @@ export class StoreScene extends Phaser.Scene {
       this.listContainer.add(dot);
     }
 
-    // Name + element
-    const name = this.add.text(x + px(70), y + px(12), def.name, {
+    // Rarity inline tag — placed right after the name on the same line so it
+    // never collides with the price button on the right.
+    const rarityTag = this.add.text(x + px(70 + 56), y + px(13), `· ${RARITY_LABEL[def.rarity]}`, {
+      fontFamily: 'sans-serif', fontSize: '11px', color: rarityColor, fontStyle: 'bold',
+    });
+    this.listContainer.add(rarityTag);
+
+    // Name + tagline (mechanic summary) — much more useful than `element · cost`
+    const name = this.add.text(x + px(70), y + px(10), def.name, {
       fontFamily: 'sans-serif', fontSize: '15px', color: PALETTE.textBright, fontStyle: 'bold',
     });
-    const desc = this.add.text(x + px(70), y + px(34), `${def.element} · ${def.cost} 💰 / 局内造价`, {
-      fontFamily: 'sans-serif', fontSize: '11px', color: PALETTE.textDim,
+    const tag = this.add.text(x + px(70), y + px(30), def.tagline, {
+      fontFamily: 'sans-serif', fontSize: '11px', color: PALETTE.text,
     });
-    this.listContainer.add([name, desc]);
+    const meta = this.add.text(x + px(70), y + px(46), `${def.element} · 局内造价 ${def.cost} 💰`, {
+      fontFamily: 'sans-serif', fontSize: '10px', color: PALETTE.textFaint,
+    });
+    this.listContainer.add([name, tag, meta]);
 
     // Right-side action
     this.makeBuyAction({
@@ -222,15 +235,43 @@ export class StoreScene extends Phaser.Scene {
     const canAfford = cur >= cost;
     const btnColor = canAfford ? PALETTE.btnUpgrade : PALETTE.btnDisabled;
     const btn = this.add.rectangle(x + px(64), y + h / 2, px(120), px(34), hexColor(btnColor)).setOrigin(0.5);
-    btn.setStrokeStyle(1, hexColor(PALETTE.divider));
-    btn.setInteractive({ useHandCursor: true });
+    btn.setStrokeStyle(1, hexColor(canAfford ? PALETTE.divider : PALETTE.danger), canAfford ? 1 : 0.4);
+    btn.setInteractive({ useHandCursor: canAfford });
     const lbl = this.add.text(x + px(64), y + h / 2, `⭐ ${cost}`, {
-      fontFamily: 'sans-serif', fontSize: '13px', color: PALETTE.textBright, fontStyle: 'bold',
+      fontFamily: 'sans-serif', fontSize: '13px',
+      color: canAfford ? PALETTE.textBright : PALETTE.textDim, fontStyle: 'bold',
     }).setOrigin(0.5);
-    btn.on('pointerover', () => { if (canAfford) btn.setFillStyle(hexColor(brighten(btnColor))); });
+    btn.on('pointerover', () => {
+      if (canAfford) btn.setFillStyle(hexColor(brighten(btnColor)));
+    });
     btn.on('pointerout',  () => btn.setFillStyle(hexColor(btnColor)));
-    btn.on('pointerdown', () => { if (canAfford) onBuy(); });
+    btn.on('pointerdown', () => {
+      if (canAfford) {
+        onBuy();
+      } else {
+        // Disabled-state click: explicit feedback so the player knows *why*
+        // nothing happened (was previously a silent no-op).
+        this.flashShortfall(cost - cur, x + px(64), y + h / 2);
+      }
+    });
     this.listContainer.add([btn, lbl]);
+  }
+
+  /** Float-up "⭐ 不足 · 还差 N" message above the button on a failed click. */
+  private flashShortfall(short: number, x: number, y: number) {
+    const t = this.add.text(x, y - px(28), `⭐ 不足 · 还差 ${short}`, {
+      fontFamily: 'sans-serif', fontSize: '12px',
+      color: PALETTE.danger, fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.listContainer.add(t);
+    this.tweens.add({
+      targets: t,
+      y: y - px(48),
+      alpha: 0,
+      duration: 900,
+      ease: 'Quad.easeOut',
+      onComplete: () => t.destroy(),
+    });
   }
 
   private tryBuyTower(id: TowerId, cost: number) {

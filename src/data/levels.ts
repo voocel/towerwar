@@ -51,13 +51,14 @@ export interface LevelDef {
 
 const ALL_8: TowerId[] = ['spark', 'lava', 'frost', 'blizzard', 'arc', 'magstorm', 'toxin', 'miasma'];
 
-// Per-chapter starting gold — later chapters need more headroom.
+// Per-chapter starting gold — tightened so opening 1-2 waves are about
+// "survive + save", not "fully deploy turn 1". Headroom still grows by chapter.
 const START_GOLD_BY_CHAPTER: Record<ChapterId, number> = {
-  ch1_meadow: 200,
-  ch2_forest: 260,
-  ch3_tundra: 320,
-  ch4_volcano: 400,
-  ch5_void:   500,
+  ch1_meadow: 120,
+  ch2_forest: 160,
+  ch3_tundra: 200,
+  ch4_volcano: 240,
+  ch5_void:   300,
 };
 
 // Skill unlock — by chapter index. ch1 none / ch2 meteor / ch3 +frostnova / ch4+ all 3.

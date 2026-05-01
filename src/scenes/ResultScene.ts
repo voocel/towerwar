@@ -134,10 +134,15 @@ export class ResultScene extends Phaser.Scene {
       sy += rowH;
     }
 
-    // Buttons
-    const btnY = px(540);
+    // Buttons — anchor to the bottom of the (variable-height) stats panel
+    // so a stardust row never causes overlap. Falls back to a safe-area
+    // clamp if the panel ever grows too tall.
     const btnW = px(200);
     const btnH = px(48);
+    const btnY = Math.min(
+      panelY + panelH + px(36),
+      GAME_HEIGHT - btnH / 2 - px(24),
+    );
     if (p.victory && nextChapterId) {
       this.button(GAME_WIDTH / 2 - px(220), btnY, '下一章 →', btnW, btnH, PALETTE.btnStart, () => {
         this.registry.set(REGISTRY_KEYS.currentChapterId, nextChapterId);

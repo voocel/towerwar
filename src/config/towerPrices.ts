@@ -18,5 +18,7 @@ export const TOWER_PRICES: Record<TowerId, number> = {
   miasma:   240,
 };
 
-/** Towers that come unlocked for everyone — never appear in the store list. */
-export const DEFAULT_UNLOCKED_TOWERS: TowerId[] = ['spark'];
+/** Towers that come unlocked for everyone — never appear in the store list.
+ *  Default set deliberately spans 2 elements so first-run players can trigger
+ *  at least one reaction (fire+ice → 蒸汽) without buying anything. */
+export const DEFAULT_UNLOCKED_TOWERS: TowerId[] = ['spark', 'frost'];
