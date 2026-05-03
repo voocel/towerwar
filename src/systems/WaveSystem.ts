@@ -113,6 +113,19 @@ export function onEnemyKilled(ctx: GameContext, enemy: Enemy) {
   ctx.gold += reward;
   ctx.stats.goldEarned += reward;
   ctx.waveEnemiesRemaining = Math.max(0, ctx.waveEnemiesRemaining - 1);
+
+  // Stardust drop (meta currency). Most enemies don't drop; elites/bosses
+  // always do; defenders drop with low probability for a "bonus" feel.
+  // The reward is NOT added to runStardust here — instead we queue a spawn
+  // spec for GameScene, which creates a clickable pickup the player must
+  // grab before it falls (otherwise it's lost).
+  const sReward = enemy.def.stardustReward;
+  if (sReward && sReward > 0) {
+    const chance = enemy.def.stardustChance ?? 1;
+    if (chance >= 1 || Math.random() < chance) {
+      ctx.pendingStardustDrops.push({ x: enemy.x, y: enemy.y, amount: sReward });
+    }
+  }
 }
 
 export function onEnemyReachedEnd(ctx: GameContext, _enemy: Enemy) {

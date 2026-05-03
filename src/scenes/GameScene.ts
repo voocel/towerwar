@@ -154,6 +154,15 @@ export class GameScene extends Phaser.Scene {
       if (e.dead) onEnemyKilled(ctx, e);
       else if (e.reachedEnd) onEnemyReachedEnd(ctx, e);
     }
+
+    // Drain pending stardust drops → spawn clickable pickups (toss + gravity).
+    if (ctx.pendingStardustDrops.length) {
+      for (const d of ctx.pendingStardustDrops) {
+        this.spawnStardustPickup(d.x, d.y, d.amount);
+      }
+      ctx.pendingStardustDrops.length = 0;
+    }
+    this.updateStardustPickups(dt);
     const removed = ctx.enemies.filter(e => e.dead || e.reachedEnd);
     for (const e of removed) e.destroy();
     ctx.enemies = ctx.enemies.filter(e => !e.dead && !e.reachedEnd);
@@ -175,8 +184,114 @@ export class GameScene extends Phaser.Scene {
         goldEarned: this.ctx.stats.goldEarned,
         skillsUsed: this.ctx.stats.skillsUsed,
         relicsAcquired: [...this.ctx.ownedRelics],
+        runStardust: this.ctx.runStardust,
       });
     });
+  }
+
+  /** Floating "⭐ +N" at the position of an enemy that just dropped stardust. */
+  private spawnStardustFloat(x: number, y: number, amount: number) {
+    const t = this.add.text(x, y - px(6), `⭐ +${amount}`, {
+      fontFamily: 'sans-serif', fontSize: '13px',
+      color: PALETTE.accentHot, fontStyle: 'bold',
+    }).setOrigin(0.5).setDepth(45);
+    this.tweens.add({
+      targets: t,
+      y: y - px(38),
+      alpha: 0,
+      duration: 1100,
+      ease: 'Quad.easeOut',
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  /** Spawn a clickable stardust pickup that flies up, falls under gravity,
+   *  and despawns on touching its floor line. The reward is *only* granted
+   *  when the player clicks it — landing = lost forever. */
+  private spawnStardustPickup(x: number, y: number, amount: number) {
+    const c = this.add.container(x, y).setDepth(60);
+
+    // Big pulsing halo so the pickup is unmissable in a busy field.
+    const halo = this.add.circle(0, 0, px(22), hexColor(PALETTE.accentHot), 0.28);
+    const dot  = this.add.circle(0, 0, px(15), hexColor(PALETTE.accentHot), 0.95);
+    dot.setStrokeStyle(2, 0xffffff, 0.85);
+    const lbl  = this.add.text(0, 0, '⭐', {
+      fontFamily: 'sans-serif', fontSize: '16px',
+    }).setOrigin(0.5);
+    c.add([halo, dot, lbl]);
+
+    // Generous click target.
+    c.setSize(px(48), px(48));
+    c.setInteractive(
+      new Phaser.Geom.Circle(0, 0, px(24)),
+      Phaser.Geom.Circle.Contains,
+    );
+    if (c.input) c.input.cursor = 'pointer';
+
+    this.tweens.add({
+      targets: halo,
+      scale: 1.6, alpha: 0.06,
+      duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+
+    const pickup = {
+      amount, x, y,
+      vx: (Math.random() - 0.5) * px(80),
+      vy: -px(220),
+      floorY: y + px(18),
+      gfx: c,
+      done: false,
+    };
+    this.ctx.stardustPickups.push(pickup);
+
+    c.on('pointerdown', () => {
+      if (pickup.done) return;
+      pickup.done = true;
+      this.ctx.runStardust += pickup.amount;
+      this.spawnStardustFloat(pickup.x, pickup.y, pickup.amount);
+      audio.playSfx('sfx_click');
+      this.tweens.add({
+        targets: c,
+        scaleX: 1.6, scaleY: 1.6,
+        alpha: 0,
+        duration: 160,
+        ease: 'Quad.easeOut',
+        onComplete: () => c.destroy(),
+      });
+    });
+  }
+
+  /** Per-tick physics for live pickups: gravity, position update, expiry. */
+  private updateStardustPickups(dt: number) {
+    const ctx = this.ctx;
+    if (ctx.stardustPickups.length === 0) return;
+    const gravity = px(560);
+    for (const p of ctx.stardustPickups) {
+      if (p.done) continue;
+      p.vy += gravity * dt;
+      p.x  += p.vx * dt;
+      p.y  += p.vy * dt;
+      if (p.gfx) p.gfx.setPosition(p.x, p.y);
+      // Despawn when descending and below the floor line.
+      if (p.vy > 0 && p.y >= p.floorY) {
+        p.done = true;
+        if (p.gfx) {
+          const gfx = p.gfx;
+          this.tweens.add({
+            targets: gfx,
+            alpha: 0, scaleX: 0.4, scaleY: 0.4,
+            duration: 180,
+            ease: 'Quad.easeIn',
+            onComplete: () => gfx.destroy(),
+          });
+          p.gfx = undefined;
+        }
+      }
+    }
+    // Drop completed pickups from the list.
+    if (ctx.stardustPickups.some(p => p.done)) {
+      ctx.stardustPickups = ctx.stardustPickups.filter(p => !p.done);
+    }
   }
 
   // ───────────── drawing ─────────────

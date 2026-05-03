@@ -23,6 +23,25 @@ export interface GroundZone {
   gfx?: Phaser.GameObjects.Graphics;
 }
 
+/** Clickable stardust drop tossed into the air on enemy kill.
+ *  Must be collected (clicked) before gravity brings it back down — when
+ *  it touches floorY it despawns silently and the reward is lost. */
+export interface StardustPickup {
+  amount: number;
+  // World position (px, DPR-scaled)
+  x: number;
+  y: number;
+  // Velocity (px/sec)
+  vx: number;
+  vy: number;
+  /** Y at which the pickup expires (set just below the spawn position). */
+  floorY: number;
+  /** Phaser container that renders this pickup — owned by GameScene. */
+  gfx?: Phaser.GameObjects.Container;
+  /** Lifecycle gate: prevents double-collect from a click + physics race. */
+  done: boolean;
+}
+
 /**
  * Mutable scene-scoped state. Replaces the old global singleton.
  * One instance per GameScene; lives only as long as the scene is active.
@@ -78,6 +97,18 @@ export class GameContext {
     reactionsTriggered: 0,
     skillsUsed: 0,
   };
+
+  /** Stardust accumulated *during* this run from enemy kills.
+   *  Persisted at result time (full amount on victory, ½ on defeat). */
+  runStardust: number = 0;
+
+  /** Spawn requests produced this tick — GameScene drains them every frame
+   *  to instantiate clickable {@link StardustPickup}s. */
+  pendingStardustDrops: { x: number; y: number; amount: number }[] = [];
+
+  /** Live pickups currently in flight. Updated each tick (gravity + floor
+   *  expiry) and cleared on click / despawn. */
+  stardustPickups: StardustPickup[] = [];
 
   // ─── Talent-driven modifiers (set by TalentSystem.applyEquipped) ─────
   /** Multiplier on enemy kill gold (1 = no change). */

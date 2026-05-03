@@ -163,14 +163,15 @@ const FIRST_CLEAR_BONUS = 80;
  * Persist a chapter victory:
  *  - bumps stars (max-of)
  *  - unlocks next chapter (if any)
- *  - awards stardust = base[★] (+50 first time only)
- * Returns the stardust delta granted, so the caller can show a popup.
+ *  - awards stardust = base[★] (+50 first time only) + runStardust drops
+ * Returns the *total* stardust delta granted, so the caller can show a popup.
  */
 export function recordChapterVictory(
   registry: Phaser.Data.DataManager,
   chapterId: ChapterId,
   stars: number,
   nextChapterId: ChapterId | null,
+  runStardust: number = 0,
 ): number {
   const unlocked: ChapterId[] = [
     ...((registry.get(REGISTRY_KEYS.unlockedChapters) as ChapterId[] | undefined) ?? DEFAULT_UNLOCKED_CHAPTERS),
@@ -190,7 +191,9 @@ export function recordChapterVictory(
   // stardust delta: pay only for *new* stars (so re-clearing doesn't double-pay)
   const prevAward = STARDUST_PER_STAR[prev] ?? 0;
   const newAward  = STARDUST_PER_STAR[stars] ?? 0;
-  const delta = Math.max(0, newAward - prevAward) + (wasFirstClear ? FIRST_CLEAR_BONUS : 0);
+  const delta = Math.max(0, newAward - prevAward)
+              + (wasFirstClear ? FIRST_CLEAR_BONUS : 0)
+              + runStardust;
 
   const curStardust = (registry.get(REGISTRY_KEYS.stardust) as number | undefined) ?? 0;
   const nextStardust = curStardust + delta;
@@ -201,6 +204,18 @@ export function recordChapterVictory(
   writeSave(snapshotFromRegistry(registry));
 
   return delta;
+}
+
+/** Add a flat amount of stardust (used for defeat consolation drops). */
+export function awardStardust(
+  registry: Phaser.Data.DataManager,
+  amount: number,
+): number {
+  if (amount <= 0) return 0;
+  const cur = (registry.get(REGISTRY_KEYS.stardust) as number | undefined) ?? 0;
+  registry.set(REGISTRY_KEYS.stardust, cur + amount);
+  writeSave(snapshotFromRegistry(registry));
+  return amount;
 }
 
 export function isChapterUnlocked(

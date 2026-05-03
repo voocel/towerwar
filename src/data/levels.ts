@@ -84,12 +84,36 @@ interface ChapterWaveBlocks {
   boss: WaveDef[];     // waves 10-12 (boss approach + BOSS); second relic node fires after wave 8 → just before this block
 }
 
+/**
+ * Boost the spawn count of every non-boss enemy in a wave by +60% so each
+ * wave actually feels like a wave (was previously over in 6-10s). Bosses
+ * stay at count = 1; their `delay` is also untouched, so spawn cadence is
+ * preserved — only the *amount* increases. Tweak the multiplier here to
+ * tune wave length globally.
+ */
+const COUNT_DENSITY = 1.6;
+function densifyWave(w: WaveDef): WaveDef {
+  return {
+    ...w,
+    spawns: w.spawns.map(s => ({
+      ...s,
+      count: s.count <= 1 ? s.count : Math.ceil(s.count * COUNT_DENSITY),
+    })),
+  };
+}
+
 function buildChapterLevel(chapterId: ChapterId, displayName: string, blocks: ChapterWaveBlocks): LevelDef {
   const ch = CHAPTERS[chapterId];
   const startLives = 20;
 
-  // Concatenate + renumber waves 1..12 so HUD labels stay sequential.
-  const all = [...blocks.pre, ...blocks.mid, ...blocks.late, ...blocks.boss];
+  // Apply density multiplier (×1.6 spawn count for non-boss enemies) before
+  // numbering so each wave feels meatier across all 5 chapters.
+  const all = [
+    ...blocks.pre.map(densifyWave),
+    ...blocks.mid.map(densifyWave),
+    ...blocks.late.map(densifyWave),
+    ...blocks.boss.map(densifyWave),
+  ];
   const waves: WaveDef[] = all.map((w, i) => ({ ...w, id: i + 1, name: w.name ?? `波 ${i + 1}` }));
 
   return {

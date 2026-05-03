@@ -3,7 +3,7 @@ import { SCENES, GAME_WIDTH, GAME_HEIGHT, REGISTRY_KEYS, px } from '@/constants'
 import { PALETTE, brighten } from '@/theme';
 import { hexColor } from '@/utils/Grid';
 import { getLevel } from '@/data/levels';
-import { recordChapterVictory } from '@/systems/SaveSystem';
+import { recordChapterVictory, awardStardust } from '@/systems/SaveSystem';
 import { CHAPTER_ORDER } from '@/data/chapters';
 import type { ChapterId } from '@/data/chapters';
 import { audio } from '@/managers/AudioManager';
@@ -19,6 +19,8 @@ interface ResultPayload {
   goldEarned: number;
   skillsUsed: number;
   relicsAcquired: RelicId[];
+  /** Stardust dropped from kills during this run (elites/bosses/lucky defenders). */
+  runStardust: number;
 }
 
 export class ResultScene extends Phaser.Scene {
@@ -53,9 +55,20 @@ export class ResultScene extends Phaser.Scene {
 
     // Persist on victory before painting. Stage-11 progress is chapter-grain:
     // stars unlock the next chapter and grant account-bound stardust.
-    let stardustDelta = 0;
+    // Defeat still awards 50% of the in-run drops as consolation so a failed
+    // attempt is never *fully* wasted — but enough penalty to discourage
+    // intentional losses.
+    const battleDrop = p.runStardust ?? 0;
+    let stardustTotal = 0;     // total written to save this result
+    let clearReward = 0;       // portion from stars + first-clear (victory only)
+    let dropReward = 0;        // portion from in-run kills (after defeat ½ cut)
     if (p.victory) {
-      stardustDelta = recordChapterVictory(this.registry, level.chapterId, stars, nextChapterId);
+      stardustTotal = recordChapterVictory(this.registry, level.chapterId, stars, nextChapterId, battleDrop);
+      dropReward = battleDrop;
+      clearReward = stardustTotal - dropReward;
+    } else if (battleDrop > 0) {
+      dropReward = Math.floor(battleDrop * 0.5);
+      stardustTotal = awardStardust(this.registry, dropReward);
     }
 
     // Stop any chapter BGM and play the result sting.
@@ -111,9 +124,14 @@ export class ResultScene extends Phaser.Scene {
       ['💰 获得金币', `${p.goldEarned}`, PALETTE.accent],
       ['✨ 拾取遗物', relicCell, PALETTE.accentMint],
     ];
-    if (stardustDelta > 0) {
-      stats.push(['⭐ 星辉奖励', `+${stardustDelta}`, PALETTE.accentHot]);
+    if (dropReward > 0) {
+      const label = p.victory ? '⭐ 战斗掉落' : '⭐ 战斗掉落 (×½)';
+      stats.push([label, `+${dropReward}`, PALETTE.accentHot]);
     }
+    if (clearReward > 0) {
+      stats.push(['⭐ 通关奖励', `+${clearReward}`, PALETTE.accentHot]);
+    }
+    void stardustTotal; // total surfaced via the registry / popups elsewhere
 
     const rowH = px(34);
     const panelW = px(360);
